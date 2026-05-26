@@ -46,7 +46,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version-file: 'package.json'
+          node-version: '20'
           cache: 'pnpm'
 
       # 安装依赖
@@ -84,6 +84,11 @@ jobs:
           else
             sed -i '/^SHOW_AFF = /d' wrangler.toml
           fi
+          if [ -n "${ENABLE_OPENAPI}" ]; then
+            sed -i "s#\${ENABLE_OPENAPI}#${ENABLE_OPENAPI}#g" wrangler.toml
+          else
+            sed -i '/^ENABLE_OPENAPI = /d' wrangler.toml
+          fi
         env:
           D1_DATABASE_ID: ${{ secrets.D1_DATABASE_ID }}
           D1_DATABASE_NAME: ${{ secrets.D1_DATABASE_NAME }}
@@ -94,6 +99,7 @@ jobs:
           PASSWORD: ${{ secrets.PASSWORD }}
           API_RATE_LIMIT_PER_MINUTE: ${{ secrets.API_RATE_LIMIT_PER_MINUTE }}
           SHOW_AFF: ${{ secrets.SHOW_AFF }}
+          ENABLE_OPENAPI: ${{ secrets.ENABLE_OPENAPI }}
       
       # 新增：在部署前应用 D1 数据库迁移
       # 这一步会明确地告诉 Wrangler 远程执行 D1 数据库的迁移脚本。
