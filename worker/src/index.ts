@@ -2,7 +2,7 @@ import { Hono } from 'hono';
 import { serveStatic } from 'hono/cloudflare-workers';
 import { cors } from 'hono/cors';
 // 导入数据库相关的模块
-import { deleteEmails, findEmailById, getEmailsByMessageTo, insertEmail, deleteExpiredEmails, insertApiKey, getSiteStats, incrementEmailsReceived, incrementApiKeysCreated, incrementAddressesCreated, incrementDailyAddressesCreated, incrementDailyEmailsReceived, incrementDailyApiKeysCreated, getMailboxMetaByAddress } from './database/dao';
+import { deleteEmails, findEmailById, getEmailsByMessageTo, insertEmail, deleteExpiredEmails, deleteExpiredMailboxes, insertApiKey, getSiteStats, incrementEmailsReceived, incrementApiKeysCreated, incrementAddressesCreated, incrementDailyAddressesCreated, incrementDailyEmailsReceived, incrementDailyApiKeysCreated, getMailboxMetaByAddress } from './database/dao';
 import { getD1DB } from './database/db';
 import { InsertEmail, insertEmailSchema } from './database/schema';
 import { nanoid } from 'nanoid/non-secure';
@@ -163,9 +163,11 @@ api.post('/verify', turnstile, async (c) => {
 // 生成 API Key 的函数
 function generateApiKey(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const randomBytes = new Uint8Array(32);
+  crypto.getRandomValues(randomBytes);
   let key = 'vmail_';
   for (let i = 0; i < 32; i++) {
-    key += chars.charAt(Math.floor(Math.random() * chars.length));
+    key += chars.charAt(randomBytes[i] % chars.length);
   }
   return key;
 }
@@ -334,7 +336,6 @@ app.get('/config', (c) => {
     emailDomain: emailDomain, // 返回域名数组
     turnstileKey: c.env.TURNSTILE_KEY,
     turnstileEnabled,
-    cookiesSecret: c.env.COOKIES_SECRET,
     sitePasswordEnabled: Boolean(c.env.PASSWORD),
     apiRateLimitPerMinute: parseRateLimitPerMinute(c.env),
     openApiEnabled,
@@ -425,20 +426,32 @@ export default {
   async email(message: ForwardableEmail, env: Env, ctx: ExecutionContext) {
     try {
       const db = getD1DB(env.DB);
+
+      // 验证收件人域名是否在配置的域名列表中，拒绝非本站域名的邮件
+      const allowedDomains = env.EMAIL_DOMAIN
+        ? env.EMAIL_DOMAIN.split(',').map((d: string) => d.trim().toLowerCase())
+        : [];
+      const toDomain = message.to.split('@')[1];
+      if (!toDomain || !allowedDomains.includes(toDomain.toLowerCase())) {
+        console.error(`拒绝邮件：域名 ${toDomain || '未知'} 不在允许的域名列表中`);
+        message.setReject(`域名不受支持: ${toDomain || '未知'}`);
+        return;
+      }
+
       // 将原始邮件流转换为文本
       const raw = await new Response(message.raw).text();
       // 使用 postal-mime 解析邮件
       const mail = await new PostalMime().parse(raw);
       const now = new Date();
 
-      // **关键修复**：显式地从解析结果中映射字段，而不是使用对象展开(...)
-      // 这样可以避免属性覆盖和类型不匹配的问题
+      // 显式地从解析结果中映射字段，并处理 postal-mime 可能返回 undefined 的字段
       const newEmail: InsertEmail = {
         id: nanoid(),
         messageFrom: message.from,
         messageTo: message.to,
-        headers: mail.headers || [], // 确保 headers 存在
-        from: mail.from,
+        headers: mail.headers || [],
+        // postal-mime 的 from 是 Address | undefined，schema 期望 Address
+        from: mail.from || { address: message.from, name: '' },
         sender: mail.sender,
         replyTo: mail.replyTo,
         deliveredTo: mail.deliveredTo,
@@ -447,7 +460,8 @@ export default {
         cc: mail.cc,
         bcc: mail.bcc,
         subject: mail.subject,
-        messageId: mail.messageId, // messageId 在数据库中是必需的
+        // messageId 可能为 undefined，用 nanoid 兜底
+        messageId: mail.messageId || nanoid(),
         inReplyTo: mail.inReplyTo,
         references: mail.references,
         date: mail.date,
@@ -504,12 +518,15 @@ export default {
     return response;
   },
 
-  // 定时任务 (清理过期邮件)
+  // 定时任务 (清理过期邮件、过期邮箱、过期限流数据)
   async scheduled(event, env, ctx) {
       const db = getD1DB(env.DB);
-      // 修复：将清理时间从1小时修改为24小时（1天）
       const oneDayAgo = new Date(Date.now() - 1000 * 60 * 60 * 24);
       await deleteExpiredEmails(db, oneDayAgo);
-      console.log(`已清理 ${oneDayAgo.toISOString()} 之前的过期邮件`); // 添加日志
+      await deleteExpiredMailboxes(db);
+      // 清理 2 小时前的限流窗口数据，防止表无限膨胀
+      const twoHoursAgo = Math.floor((Date.now() - 2 * 60 * 60 * 1000) / 1000);
+      await db.delete(await import('./database/schema').then(s => s.apiRateLimits)).where((row: any) => row.windowStartEpochSec < twoHoursAgo).execute();
+      console.log(`已清理 ${oneDayAgo.toISOString()} 之前的过期邮件、过期邮箱和 2 小时前的限流数据`);
   },
 };

@@ -53,7 +53,7 @@ export const emails = sqliteTable("emails", {
   messageFrom: text("message_from").notNull(),
   messageTo: text("message_to").notNull(),
   headers: text("headers", { mode: "json" }).$type<Header[]>().notNull(),
-  from: text("from", { mode: "json" }).$type<Address>().notNull(),
+  from: text("from", { mode: "json" }).$type<Address>(),
   sender: text("sender", { mode: "json" }).$type<Address>(),
   replyTo: text("reply_to", { mode: "json" }).$type<Address[]>(),
   deliveredTo: text("delivered_to"),
@@ -62,7 +62,7 @@ export const emails = sqliteTable("emails", {
   cc: text("cc", { mode: "json" }).$type<Address[]>(),
   bcc: text("bcc", { mode: "json" }).$type<Address[]>(),
   subject: text("subject"),
-  messageId: text("message_id").notNull(),
+  messageId: text("message_id"),
   inReplyTo: text("in_reply_to"),
   references: text("references"),
   date: text("date"),
@@ -86,7 +86,7 @@ const AddressSchema = z.object({
 // 使用 drizzle-zod 基于 emails 表结构创建用于插入操作的 Zod schema
 export const insertEmailSchema = createInsertSchema(emails, {
   headers: z.array(z.record(z.string())),
-  from: AddressSchema,
+  from: AddressSchema.optional(),
   sender: AddressSchema.optional(),
   replyTo: z.array(AddressSchema).optional(),
   to: z.array(AddressSchema).optional(),
