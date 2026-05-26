@@ -12,7 +12,6 @@ keep_vars = true
 binding = "DB"
 database_name = "${D1_DATABASE_NAME}"
 database_id = "${D1_DATABASE_ID}"
-# fix: 将迁移目录直接配置在这里，这是 D1 自动迁移的标准做法
 migrations_dir = "worker/drizzle"
 
 # 定义环境变量和密钥
@@ -28,7 +27,7 @@ ENABLE_OPENAPI = "${ENABLE_OPENAPI}"
 
 # 配置邮件处理
 [triggers]
-crons = ["0 * * * *"] # 每小时运行一次清理任务
+crons = ["0 * * * *"]
 
 # 构建配置
 [build]

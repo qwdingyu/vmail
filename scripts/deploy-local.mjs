@@ -12,7 +12,7 @@
  *   CF_ACCOUNT_ID      - Cloudflare Account ID (可选，自动查询)
  *   D1_DATABASE_ID     - D1 数据库 ID (可选，自动查询 vmail)
  *   D1_DATABASE_NAME   - D1 数据库名称，默认 vmail
- *   EMAIL_DOMAIN       - 邮箱域名，默认 mail.eforge.xyz
+ *   EMAIL_DOMAIN       - 邮箱域名，默认 eforge.xyz
  *   COOKIES_SECRET     - Cookie 加密密钥 (可选，自动生成)
  *   TURNSTILE_KEY      - Turnstile Site Key (可选)
  *   TURNSTILE_SECRET   - Turnstile Secret Key (可选)
@@ -20,7 +20,7 @@
  *   API_RATE_LIMIT     - API 限流 (可选，默认 100)
  *   SHOW_AFF           - 是否显示推广 (可选)
  *   ENABLE_OPENAPI     - 是否启用 OpenAPI (可选，默认 true)
- *   CUSTOM_DOMAIN      - 自定义域名，默认 mail.eforge.xyz
+ *   CUSTOM_DOMAIN      - Worker 访问域名，默认 mail.eforge.xyz
  */
 
 import { execSync } from "node:child_process";
@@ -37,7 +37,7 @@ const CONFIG = {
   accountId: process.env.CF_ACCOUNT_ID || "f4c2f5b7c4134455ba93f1ebc0233664",
   d1DatabaseId: process.env.D1_DATABASE_ID || null,
   d1DatabaseName: process.env.D1_DATABASE_NAME || "vmail",
-  emailDomain: process.env.EMAIL_DOMAIN || "mail.eforge.xyz",
+  emailDomain: process.env.EMAIL_DOMAIN || "eforge.xyz",
   cookiesSecret: process.env.COOKIES_SECRET || null,
   turnstileKey: process.env.TURNSTILE_KEY || "",
   turnstileSecret: process.env.TURNSTILE_SECRET || "",
