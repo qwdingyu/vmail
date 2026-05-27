@@ -153,8 +153,8 @@ async function enableEmailRouting(zoneId) {
     console.log("  ║                                                         ║");
     console.log("  ║  1. 登录 Cloudflare Dashboard                          ║");
     console.log("  ║  2. 进入 Workers & Pages → Email Routing               ║");
-    console.log("  ║  3. 选择域名 ${CONFIG.emailDomain}                     ║");
-    console.log("  ║  4. 点击 "Enable Email Routing" 启用                   ║");
+    console.log(`  ║  3. 选择域名 ${CONFIG.emailDomain}                     ║`);
+    console.log('  ║  4. 点击 "Enable Email Routing" 启用                   ║');
     console.log("  ║  5. 然后重新运行此脚本创建路由规则                       ║");
     console.log("  ╚═══════════════════════════════════════════════════════════╝");
     console.log("");
