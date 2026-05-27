@@ -29,6 +29,10 @@ ENABLE_OPENAPI = "${ENABLE_OPENAPI}"
 [triggers]
 crons = ["0 * * * *"]
 
+# Email Worker 绑定：启用后 Cloudflare 会将路由到的邮件转发给 Worker 的 email handler
+[email]
+binding = "EMAIL"
+
 # 构建配置
 [build]
 command = "pnpm run build"
