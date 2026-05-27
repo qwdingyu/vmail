@@ -50,6 +50,18 @@ function parseRateLimitPerMinute(env: Env): number {
   return parsed;
 }
 
+function parseAllowedDomains(env: Env): string[] {
+  return env.EMAIL_DOMAIN
+    ? env.EMAIL_DOMAIN.split(',').map((d: string) => d.trim().toLowerCase())
+    : [];
+}
+
+function isValidEmailDomain(env: Env, address: string): boolean {
+  const allowedDomains = parseAllowedDomains(env);
+  const domain = address.split('@')[1];
+  return !!domain && allowedDomains.includes(domain.toLowerCase());
+}
+
 function isSiteUnlocked(request: Request, env: Env): boolean {
   if (!env.PASSWORD) {
     return true;
@@ -237,6 +249,9 @@ api.post('/emails', async (c) => {
   if (!address) {
     return c.json({ message: 'address is required' }, 400);
   }
+  if (!isValidEmailDomain(c.env, address as string)) {
+    return c.json({ message: 'Invalid email domain' }, 400);
+  }
   const safeLimit = Number.isFinite(limit) && limit > 0 ? Math.min(limit, 100) : 50;
   const emails = await getEmailsByMessageTo(db, address as string, safeLimit);
   return c.json(emails);
@@ -255,6 +270,9 @@ api.post('/emails/meta', async (c) => {
   if (!address) {
     return c.json({ message: 'address is required' }, 400);
   }
+  if (!isValidEmailDomain(c.env, address as string)) {
+    return c.json({ message: 'Invalid email domain' }, 400);
+  }
 
   const meta = await getMailboxMetaByAddress(db, address as string);
   return c.json(meta);
@@ -265,10 +283,12 @@ api.post('/emails/meta', async (c) => {
 api.get('/emails/:id', async (c) => {
   const db = getD1DB(c.env.DB);
   const { id } = c.req.param();
-  // 函数调用修正：使用 findEmailById 函数
   const email = await findEmailById(db, id);
   if (!email) {
     return c.json({ message: 'Email not found'}, 404);
+  }
+  if (!isValidEmailDomain(c.env, email.messageTo)) {
+    return c.json({ message: 'Invalid email domain' }, 400);
   }
   return c.json(email);
 });
@@ -281,14 +301,25 @@ api.post('/delete-emails', async (c) => {
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
         return c.json({ message: 'ids are required' }, 400);
     }
-    const result = await deleteEmails(db, ids as string[]);
+    // 校验：只允许删除属于已配置域名的邮件，防止通过 ID 枚举删除任意邮件
+    const allowedDomains = parseAllowedDomains(c.env);
+    const emailsToDelete = await Promise.all(ids.map((id: string) => findEmailById(db, id)));
+    const validIds = emailsToDelete
+        .filter((email): email is NonNullable<typeof email> => {
+            if (!email) return false;
+            const domain = email.messageTo?.split('@')[1];
+            return domain && allowedDomains.includes(domain.toLowerCase());
+        })
+        .map((email) => email.id);
+    if (validIds.length === 0) {
+        return c.json({ message: 'No valid emails to delete' }, 400);
+    }
+    const result = await deleteEmails(db, validIds);
     return c.json(result);
 });
 
-// 修复：移除登录接口的 turnstile 中间件，使其不再需要人机验证。
+// 登录接口：通过 XOR 解密密钥获取邮箱地址
 api.post('/login', async (c) => {
-  // const db = getD1DB(c.env.DB); // 数据库连接不再需要用于验证
-  // 修复：由于移除了 turnstile 中间件，现在需要在此处直接解析请求体。
   const body = await c.req.json();
   const password = body?.password;
 
@@ -297,29 +328,12 @@ api.post('/login', async (c) => {
   }
 
   try {
-    // 解密密码以获取邮箱地址
     const address = decrypt(password, c.env.COOKIES_SECRET);
-    
-    // **核心修复**：移除数据库邮件检查逻辑
-    // 不再需要查询数据库中是否存在该地址的邮件
-    // const emails = await getEmailsByMessageTo(db, address);
-    // if (emails.length === 0) {
-      // 如果该地址从未收到过邮件，则视为无效密码
-      // return c.json({ message: 'Invalid password' }, 404);
-    // }
-
-    // 可选：添加一个简单的邮箱地址格式校验，增加健壮性
-    // 例如，检查是否包含 '@' 符号
     if (!address || typeof address !== 'string' || !address.includes('@')) {
-        console.error("解密后的地址格式无效:", address);
-        return c.json({ message: 'Invalid password' }, 400); // 地址格式不对也视为密码无效
+      return c.json({ message: 'Invalid password' }, 400);
     }
-
-    // 登录成功，返回邮箱地址
     return c.json({ address });
-  } catch (e) {
-    console.error("Login error:", e);
-    // 如果解密失败或发生其他错误，返回无效密码错误
+  } catch {
     return c.json({ message: 'Invalid password' }, 400);
   }
 });
