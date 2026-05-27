@@ -115,3 +115,12 @@ jobs:
         with:
           apiToken: ${{ secrets.CF_API_TOKEN }}
           accountId: ${{ secrets.CF_ACCOUNT_ID }}
+
+      # 自动配置 Email Routing（通过 Cloudflare API）
+      # 启用 Email Routing、添加 MX 记录、创建转发到 Worker 的路由规则
+      - name: Setup Email Routing
+        run: node scripts/setup-email-routing.mjs
+        env:
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          EMAIL_DOMAIN: ${{ secrets.EMAIL_DOMAIN }}
