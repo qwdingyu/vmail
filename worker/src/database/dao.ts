@@ -5,11 +5,7 @@ import { DrizzleD1Database } from "drizzle-orm/d1";
 import { emails, InsertEmail, apiKeys, InsertApiKey, mailboxes, InsertMailbox, siteStats, SiteStats, dailyStats, DailyStats, apiRateLimits } from "./schema";
 
 export async function insertEmail(db: DrizzleD1Database, email: InsertEmail) {
-  try {
-    await db.insert(emails).values(email).execute();
-  } catch (e) {
-    console.error(e);
-  }
+  await db.insert(emails).values(email).execute();
 }
 
 export async function getEmails(db: DrizzleD1Database) {

@@ -455,7 +455,9 @@ export default {
       // 将原始邮件流转换为文本
       const raw = await new Response(message.raw).text();
       // 使用 postal-mime 解析邮件
-      const mail = await new PostalMime().parse(raw);
+      const parsed = await new PostalMime().parse(raw);
+      // postal-mime v2 returns an array for MIME multipart messages
+      const mail = Array.isArray(parsed) ? parsed[0] : parsed;
       const now = new Date();
 
       // 显式地从解析结果中映射字段，并处理 postal-mime 可能返回 undefined 的字段
