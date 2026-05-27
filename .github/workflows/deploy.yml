@@ -118,7 +118,10 @@ jobs:
 
       # 自动配置 Email Routing（通过 Cloudflare API）
       # 启用 Email Routing、添加 MX 记录、创建转发到 Worker 的路由规则
+      # continue-on-error: Email Routing 启用需要 Zone Email Routing Edit 权限，
+      # 如果 Token 权限不足会提示用户手动在 Dashboard 启用
       - name: Setup Email Routing
+        continue-on-error: true
         run: node scripts/setup-email-routing.mjs
         env:
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
